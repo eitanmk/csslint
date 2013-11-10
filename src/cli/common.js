@@ -134,6 +134,7 @@ function cli(api){
      */
     function processFile(relativeFilePath, options) {
         var input = api.readFile(relativeFilePath),
+            sourcemap = readSourceMap(relativeFilePath) || null,
             ruleset = filterRules(options),
             result = CSSLint.verify(input, gatherRules(options, ruleset)),
             formatter = CSSLint.getFormatter(options.format || "text"),
@@ -151,6 +152,7 @@ function cli(api){
         } else {
             //var relativeFilePath = getRelativePath(api.getWorkingDirectory(), fullFilePath);
             options.fullPath = api.getFullPath(relativeFilePath);
+            result = processSourceMap(sourcemap, result);
             output = formatter.formatResults(result, relativeFilePath, options);
             if (output){
                 api.print(output);
@@ -162,6 +164,42 @@ function cli(api){
         }
 
         return exitCode;
+    }
+
+    /**
+     * Attempts to read a sourcemap in the same directory as the file
+     * @return {String}
+     */
+    function readSourceMap(relativeFilePath) {
+        return api.readFile(relativeFilePath + '.map');
+    }
+
+    function processSourceMap(sourcemap, result) {
+        var smc;
+
+        if (!sourcemap) {
+            return result;
+        }
+
+        smc = new sourcemaplib.SourceMapConsumer(JSON.parse(sourcemap));
+        CSSLint.Util.forEach(result.messages, function (msg) {
+            if (!msg.rollup) {
+                var originalContents,
+                    lookupResult = smc.originalPositionFor({
+                        line: msg.line,
+                        column: msg.col
+                    });
+
+                originalContents = api.readFile(api.getFullPath(lookupResult.source));
+
+                msg.line = lookupResult.line;
+                msg.col = lookupResult.column;
+                msg.evidence = originalContents.replace(/\n\r?/g, "$split$").split('$split$')[lookupResult.line - 1];
+                msg.originalSource = lookupResult.source;
+            }
+        });
+
+        return result;
     }
 
 

@@ -7,7 +7,8 @@
 
 var fs      = require("fs"),
     path    = require("path"),
-    CSSLint = require("./lib/csslint-node").CSSLint;
+    CSSLint = require("./lib/csslint-node").CSSLint,
+    sourcemaplib = require('source-map');
     
 cli({
     args: process.argv.slice(2),
